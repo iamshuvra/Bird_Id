@@ -29,7 +29,8 @@ data/yolo_labels/
 Thumbs.db
 
 # Windows Zone Identifier files (created automatically when downloading files on Windows)
-*.Zone.Identifier
+*Zone.Identifier
+*.Identifier
 
 # VSCode workspace settings (personal preference, don't force on others)
 .vscode/
