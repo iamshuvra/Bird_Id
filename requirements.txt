@@ -1,0 +1,11 @@
+# Detection and classification
+ultralytics       # YOLOv8 — includes torch automatically
+
+# Video reading and image operations
+opencv-python     # read .mp4 files, crop images, draw boxes
+
+# Required by ultralytics' tracker
+lap               # Linear Assignment Problem solver (needed for ByteTrack)
+
+# General
+numpy             # fast array math (used internally by ultralytics and opencv)
