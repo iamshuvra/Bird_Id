@@ -1,39 +1,39 @@
-# Python virtual environment (we create this locally, don't commit it)
 venv/
 env/
 .env
-
-# Python bytecode cache (auto-generated, not needed in git)
+.claude/
+.gitignore
 __pycache__/
 *.pyc
 *.pyo
 
-# Model weight files (too large for git, download separately)
 *.pt
 *.pth
 *.weights
 *.onnx
-
-# Full dataset folder (videos + images, gigabytes — download separately from official source)
-# Dataset: https://github.com/Ziwei89/FBD-SV-2024_github
 data/
 
-# Generated txt files from annotation script (reproducible, don't need to commit)
 datasets/dataloader/*.txt
 documents/
-# Jupyter notebook checkpoints
 .ipynb_checkpoints/
 
-# OS junk files
 .DS_Store
 Thumbs.db
 
-# Windows Zone Identifier files (created automatically when downloading files on Windows)
 *Zone.Identifier
 *.Identifier
 
-# VSCode workspace settings (personal preference, don't force on others)
 .vscode/
 
-# Original FBOD repo (cloned separately, not part of this project's code)
 FBOD/
+
+
+**/*.pyc
+**/*.mp4
+**/*.pth
+**/*.jpg
+**/*.png
+**/*.txt
+**/*.json
+**/logs/*
+**/*.sh
