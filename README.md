@@ -1,71 +1,93 @@
 # Bird Identification – Offshore Wind Turbine Monitor
 
-Detects, counts, and identifies birds in fixed-camera video.
 
-Status: **Week 1 – scaffold complete, detection ready**
+I used this github repository and their dataset to run the code: [Github Repository](https://github.com/Ziwei89/FBOD) | [Dataset](https://github.com/Ziwei89/FBD-SV-2024_github)
 
----
+## Prepare the Working Environment
 
-## Two goals
+First step is to active the environment: run 'source venv/bin/activate' when starting the project.
 
-1. **Count** — how many unique birds appear in a video
-2. **Identify** — what species each bird is
+If you don't have an environement, create one and install all the files using cmd 'pip install requirements.txt'
+In this file, we have all the required libraries mentioned to run the code. 
 
----
 
-## Project layout
+## Data Preprocessing
+We have to do some data preprocessing before jumping into training. Run these three steps in order.
 
-```
-Bird Identification/
-  data/
-    raw_clips/     put your .mp4 video files here
-    crops/         bird crop images saved here when using --save_crops
+### Step 1 — Extract video frames
+**Script:** `datasets/scripts/split_video_frames_for_object_detection.py`
 
-  datasets/
-    video_reader.py    opens a video file, yields (frame, timestamp) pairs
-
-  models/
-    detector.py        YOLOv8 wrapper — finds birds in a single frame
-    classifier.py      species identifier — crops bird and names species
-                       (stub until Week 4: always returns "Unidentifiable")
-
-  utils/
-    counter.py         tracks unique birds across frames (avoids counting
-                       the same bird many times)
-
-  detect.py            COUNT birds in a video    ← run this
-  identify.py          IDENTIFY species in a video ← run this
-  requirements.txt
-```
-
----
-
-## Quick start
+Converts all `.mp4` videos into individual `.jpg` frames using OpenCV.
 
 ```bash
-# 1. Create virtual environment
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Count birds in a video (downloads yolov8n.pt automatically on first run)
-python detect.py --video data/raw_clips/my_clip.mp4
-
-# 4. Watch live with bounding boxes
-python detect.py --video data/raw_clips/my_clip.mp4 --show
-
-# 5. Identify species + save a crop image per detection
-python identify.py --video data/raw_clips/my_clip.mp4 --save_crops
+python datasets/scripts/split_video_frames_for_object_detection.py \
+    --data_root_path=./data/FBD-SV-2024/
 ```
 
----
+Output frames are saved to `data/FBD-SV-2024/images/train/` and `data/FBD-SV-2024/images/val/` with names like `bird_93_000006.jpg`.
 
-## Model used
+### Step 2 — Generate annotation index txt files
+**Script:** `datasets/continuous_image_annotation_frames_padding.py`
 
-YOLOv8n (nano) from Ultralytics — pre-trained on COCO, knows class 14 = "bird".
-Download happens automatically on first run (~6 MB).
+This script only reads the XML labels and produces a text index file — it does **not** convert videos or images. It must be run after Step 1 because it checks whether the required image files exist on disk.
 
-For better accuracy on turbine footage: train on FBD-SV-2024.
-See: https://github.com/Ziwei89/FBD-SV-2024_github
+```bash
+python datasets/continuous_image_annotation_frames_padding.py \
+    --data_root_path=./data/FBD-SV-2024/ \
+    --input_img_num=5
+```
+
+**Output files** (written to `datasets/dataloader/`):
+- `img_label_five_continuous_difficulty_train_raw.txt`
+- `img_label_five_continuous_difficulty_val_raw.txt`
+
+**Format of each line:**
+```
+bird_93_000006.jpg  134,559,164,584,0,0.625
+      ↑                  ↑           ↑  ↑
+ first frame of      bounding box  class confidence
+ the 5-frame window  from MIDDLE   id    score
+ (frame 000006)      frame(000008)
+```
+
+- `bird_93` = video 93 in the dataset
+- `000006` = first frame of the 5-frame window `[6, 7, 8, 9, 10]`
+- `134,559,164,584` = bounding box `(xmin, ymin, xmax, ymax)` of the bird in the **middle frame** (frame `000008`)
+- `0` = class ID (`bird` is the only class, index 0)
+- `0.625` = confidence score derived from the XML `<difficult>` tag
+
+**Key parameter — `input_img_num=5`:** The model is temporal — it receives a window of 5 consecutive frames to detect the bird in the middle frame. Surrounding frames provide motion context, which helps detect tiny fast-moving birds that are hard to spot in a single frame.
+
+**Difficulty → confidence score mapping:**
+
+| `<difficult>` in XML | Confidence score |
+|---|---|
+| 0 (easy) | 0.875 |
+| 1 (general) | 0.625 |
+| 2 (hard) | 0.375 |
+| 3 (very hard) | 0.125 |
+
+Higher difficulty = lower confidence weight, so hard samples contribute less to the training loss.
+
+**Padding:** If the 5-frame window runs off the start or end of a video, the dataloader inserts black (zero) frames in place of the missing ones at runtime. This script verifies that the frames that should exist actually do before writing a line.
+
+### Step 3 — Shuffle the annotation txt files
+**Script:** `datasets/dataloader/shuffle_txt_lines.py`
+
+The raw txt files from Step 2 are ordered — all frames from one video appear together. Training on ordered data biases the model, so we shuffle before training.
+
+```bash
+python datasets/dataloader/shuffle_txt_lines.py \
+    --input_img_num=5
+```
+
+**Output files** (written to `datasets/dataloader/`):
+- `img_label_five_continuous_difficulty_train.txt`
+- `img_label_five_continuous_difficulty_val.txt`
+
+These final shuffled txt files are what the training script reads.
+
+
+
+
+

@@ -1,11 +1,9 @@
-# Detection and classification
-ultralytics       # YOLOv8 — includes torch automatically
-
-# Video reading and image operations
-opencv-python     # read .mp4 files, crop images, draw boxes
-
-# Required by ultralytics' tracker
-lap               # Linear Assignment Problem solver (needed for ByteTrack)
-
-# General
-numpy             # fast array math (used internally by ultralytics and opencv)
+torch>=2.1.0
+torchvision>=0.16.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+tqdm>=4.65.0
+matplotlib>=3.7.0
+Pillow>=10.0.0
+pycocotools>=2.0.7
+imgaug>=0.4.0
