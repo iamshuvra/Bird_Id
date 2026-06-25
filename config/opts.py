@@ -31,7 +31,7 @@ class opts(object):
         self.parser.add_argument('--Add_name', default='0816_1', type=str,
                             help='Add_name: add name to logs and pic')
         
-        self.parser.add_argument('--data_root_path', default="../../dataset/FBD-SV-2024/", type=str,
+        self.parser.add_argument('--data_root_path', default="./data/FBD-SV-2024/", type=str,
                             help='data_root_path: The path of the dataset.')
         
         self.parser.add_argument('--scale_factor', default=80, type=int,
@@ -44,6 +44,9 @@ class opts(object):
         ######### for train
         self.parser.add_argument('--Batch_size', default=8, type=int,
                             help='Batch_size: The size of batch.')
+
+        self.parser.add_argument('--num_workers', default=2, type=int,
+                            help='num_workers: DataLoader worker processes. Use 0-2 on WSL to avoid multiprocessing overhead.')
         
         self.parser.add_argument('--data_augmentation', default=True, type=bool,
                             help='data_augmentation: Determin whether to augmentate the dataset.')

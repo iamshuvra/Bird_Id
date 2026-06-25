@@ -1,10 +1,8 @@
 import torch
 import torch.nn as nn
-import sys
 import math
 import copy
-sys.path.append("..")
-from .getDynamicTargets import getTargets
+from utils.getDynamicTargets import getTargets
 
 def MSELoss(pred,target):
     return (pred-target)**2

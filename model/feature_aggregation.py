@@ -1,10 +1,7 @@
 import torch.nn as nn
-import sys
-sys.path.append("..")
-
-from .convlstm_method import ConvLSTMAggregation
-from .multiinput_method import MultiInputAggregation
-from .relatedatten_method import RelatedAttenAggregation
+from model.convlstm_method import ConvLSTMAggregation
+from model.multiinput_method import MultiInputAggregation
+from model.relatedatten_method import RelatedAttenAggregation
 
 
 

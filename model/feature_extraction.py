@@ -1,11 +1,9 @@
-import sys
-sys.path.append("..")
 import torch
 import torch.nn as nn
 from collections import OrderedDict
-from .feature_extract_CSPdarknet import feature_extract_darknet53
-from .feature_extract_MobilenetV2 import feature_extract_mobilenetv2
-from SCM_after_cat import SCMLayer
+from model.feature_extract_CSPdarknet import feature_extract_darknet53
+from model.feature_extract_MobilenetV2 import feature_extract_mobilenetv2
+from model.SCM_after_cat import SCMLayer
 
 def conv2d(filter_in, filter_out, kernel_size, stride=1):
     pad = (kernel_size - 1) // 2 if kernel_size else 0

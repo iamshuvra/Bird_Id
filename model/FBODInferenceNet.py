@@ -1,10 +1,7 @@
 import torch.nn as nn
 from collections import OrderedDict
-import sys
-sys.path.append("..")
-from feature_aggregation import ImagesAggregation
-from feature_extraction import FeatureExtraction, FeatureExtraction_MultiOutput
-from utils.feature_map_visualization import show_feature_map_heatmap
+from model.feature_aggregation import ImagesAggregation
+from model.feature_extraction import FeatureExtraction, FeatureExtraction_MultiOutput
 
 def conv2d(filter_in, filter_out, kernel_size, stride=1):
     pad = (kernel_size - 1) // 2 if kernel_size else 0
