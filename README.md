@@ -7,7 +7,7 @@ I used this github repository and their dataset to run the code: [Github Reposit
 
 First step is to active the environment: run 'source venv/bin/activate' when starting the project.
 
-If you don't have an environement, create one and install all the files using cmd 'pip install requirements.txt'
+If you don't have an environement, create one and install all the files using cmd `pip install requirements.txt`
 In this file, we have all the required libraries mentioned to run the code. 
 ```
 torch>=2.1.0
@@ -129,7 +129,29 @@ python train.py \
 - `best_AP50_<score>_epoch<N>.pth` - saved whenever AP@50 improves
 - `FB_object_detect_model.pth` - always the best model so far
 
-Re-run the same command - training auto-detects `last_checkpoint.pth` and continues from the last completed epoch.
+Re-run the same command - training auto-detects `last_checkpoint.pth` and continues from the last completed epoch. The run's settings are saved to `config.json` and reloaded on resume, and all console output is mirrored to `train_log.txt` in the same folder.
 
 **GPU note** The model uses mixed precision (AMP/FP16) automatically when a GPU is available, which gives ~2-3× speedup on RTX cards. On an RTX 4050 Laptop GPU (6 GB VRAM) expect roughly 1.5-2.5 s/iter.
+
+**Keep the machine awake (Windows/WSL):** if the PC sleeps, the GPU pauses and training stalls. In an Administrator PowerShell run `powercfg /change standby-timeout-ac 0` and `powercfg /change hibernate-timeout-ac 0` while training.
+
+## Running on Google Colab
+
+```
+!pip install -q -r requirements.txt
+
+
+!sed -i 's/set(np.sctypes\["float"\])/{np.float16, np.float32, np.float64}/' /usr/local/lib/python*/dist-packages/imgaug/imgaug.py
+!sed -i 's/set(np.sctypes\["int"\])/{np.int8, np.int16, np.int32, np.int64}/'   /usr/local/lib/python*/dist-packages/imgaug/imgaug.py
+!sed -i 's/set(np.sctypes\["uint"\])/{np.uint8, np.uint16, np.uint32, np.uint64}/' /usr/local/lib/python*/dist-packages/imgaug/imgaug.py
+
+# from google.colab import drive; drive.mount('/content/drive')
+# !cp -r "/content/drive/MyDrive/FBD-SV-2024" ./data/
+
+!python datasets/scripts/split_video_frames_for_object_detection.py --data_root_path=./data/FBD-SV-2024/
+!python datasets/continuous_image_annotation_frames_padding.py --data_root_path=./data/FBD-SV-2024/ --input_img_num=5
+!python datasets/dataloader/shuffle_txt_lines.py --input_img_num=5
+
+!python train.py --data_root_path=./data/FBD-SV-2024/ --input_img_num=5 --Batch_size=8 --num_workers=2 --end_Epoch=100 --Add_name=colab1
+```
 

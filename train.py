@@ -1,4 +1,6 @@
 import os
+import sys
+import json
 import copy
 import time
 
@@ -10,7 +12,6 @@ from torch.autograd import Variable
 from torch.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 
 from config.opts import opts
 from model.FBODInferenceNet import FBODInferenceBody
@@ -18,11 +19,35 @@ from utils.FBODLoss import LossFunc
 from utils.FB_detector import FB_Postprocess
 from utils.utils import FBObj
 from utils.mAP import mean_average_precision
+from utils.plots import get_plots_dir, log_metrics_csv, plot_all
 from datasets.dataloader.dataset_bbox import CustomDataset, dataset_collate
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 num_to_english_c_dic = {1:"one", 3:"three", 5:"five", 7:"seven", 9:"nine", 11:"eleven"}
+
+# Hyperparameters that must stay fixed for the lifetime of a run. On resume they
+# are reloaded from config.json and any conflicting CLI value is ignored, so a
+# run always continues with the settings it started with.
+LOCKED_CONFIG_KEYS = ['lr', 'Batch_size', 'scale_factor', 'data_augmentation',
+                      'input_mode', 'aggregation_method', 'backbone_name',
+                      'fusion_method', 'assign_method', 'model_input_size',
+                      'input_img_num']
+
+
+class _Tee:
+    """Duplicate writes to several streams (terminal + log file)."""
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, data):
+        for s in self.streams:
+            s.write(data)
+            s.flush()
+
+    def flush(self):
+        for s in self.streams:
+            s.flush()
 
 
 def get_classes(classes_path):
@@ -131,8 +156,8 @@ def fit_one_epoch(largest_AP_50, net, loss_func, epoch, epoch_size, epoch_size_v
     print(f'Epoch: {epoch+1}/{Epoch}')
     print(f'Total Loss: {total_loss/(epoch_size+1):.4f} | Val Loss: {val_loss/(epoch_size_val+1):.4f} | AP_50: {AP_50:.4f} | REC_50: {REC_50:.4f} | PRE_50: {PRE_50:.4f}')
 
-    train_loss_val = total_loss / (epoch_size + 1)
-    val_loss_val   = val_loss / (epoch_size_val + 1)
+    train_loss_val = float(total_loss / (epoch_size + 1))
+    val_loss_val   = float(val_loss / (epoch_size_val + 1))
 
     # ── Save checkpoint every epoch (replaces previous, so only 1 checkpoint kept) ──
     prev_ckpt = save_model_dir + 'last_checkpoint.pth'
@@ -157,46 +182,14 @@ def fit_one_epoch(largest_AP_50, net, loss_func, epoch, epoch_size, epoch_size_v
         torch.save(model.state_dict(), save_model_dir + 'FB_object_detect_model.pth')
         print(f'New best AP@50: {AP_50:.4f} — saved best model.')
 
-    if (epoch + 1) >= 30:
-        return train_loss_val, val_loss_val, largest_AP_50, AP_50
-    else:
-        return train_loss_val, val_loss_val, largest_AP_50, 0.0
-
-
-# ── Loss & AP50 plot state ──────────────────────────────────────────────────
-x_epoch = []
-record_loss = {'train_loss': [], 'test_loss': []}
-fig = plt.figure()
-ax0 = fig.add_subplot(111, title="Train the FB_object_detect model")
-ax0.set_ylabel('loss')
-ax0.set_xlabel('Epochs')
-
-x_ap50_epoch = []
-record_ap50 = {'AP_50': []}
-fig_ap50 = plt.figure()
-ax1 = fig_ap50.add_subplot(111, title="Train the FB_object_detect model")
-ax1.set_ylabel('ap_50')
-ax1.set_xlabel('Epochs')
-
-
-def draw_curve_loss(epoch, train_loss, test_loss, pic_name):
-    record_loss['train_loss'].append(train_loss)
-    record_loss['test_loss'].append(test_loss)
-    x_epoch.append(int(epoch))
-    ax0.plot(x_epoch, record_loss['train_loss'], 'b', label='train')
-    ax0.plot(x_epoch, record_loss['test_loss'], 'r', label='val')
-    if epoch == 2:
-        ax0.legend()
-    fig.savefig(pic_name)
-
-
-def draw_curve_ap50(epoch, ap_50, pic_name):
-    record_ap50['AP_50'].append(ap_50)
-    x_ap50_epoch.append(int(epoch))
-    ax1.plot(x_ap50_epoch, record_ap50['AP_50'], 'g', label='AP_50')
-    if epoch == 30:
-        ax1.legend()
-    fig_ap50.savefig(pic_name)
+    return {
+        'train_loss': train_loss_val,
+        'val_loss': val_loss_val,
+        'AP_50': AP_50,
+        'REC_50': REC_50,
+        'PRE_50': PRE_50,
+        'largest_AP_50': largest_AP_50,
+    }
 
 
 # ── Entry point ─────────────────────────────────────────────────────────────
@@ -218,22 +211,30 @@ if __name__ == "__main__":
     )
     os.makedirs(save_model_dir, exist_ok=True)
 
-    log_pic_name_loss = save_model_dir + "loss.jpg"
-    log_pic_name_ap50 = save_model_dir + "ap50.jpg"
+    # ── Mirror all print() output to a persistent log file (appends across runs) ──
+    _log_file = open(save_model_dir + "train_log.txt", "a")
+    sys.stdout = _Tee(sys.__stdout__, _log_file)
+    print(f'\n===== Run started {time.strftime("%Y-%m-%d %H:%M:%S")} =====')
 
-    config_txt = save_model_dir + "config.txt"
-    if not os.path.exists(config_txt):
-        with open(config_txt, 'w') as f:
-            f.write(f"Input mode: {opt.input_mode}\n")
-            f.write(f"Data root path: {opt.data_root_path}\n")
-            f.write(f"Aggregation method: {opt.aggregation_method}\n")
-            f.write(f"Backbone name: {opt.backbone_name}\n")
-            f.write(f"Fusion method: {opt.fusion_method}\n")
-            f.write(f"Assign method: {opt.assign_method}\n")
-            f.write(f"Scale factor: {opt.scale_factor}\n")
-            f.write(f"Batch size: {opt.Batch_size}\n")
-            f.write(f"Data augmentation: {opt.data_augmentation}\n")
-            f.write(f"Learn rate: {opt.lr}\n")
+    # All plots, metrics.csv and training state go in logs/<config>/plots/
+    plots_dir = get_plots_dir(save_model_dir)
+
+    # ── Persist run config to JSON; on resume reload it so hyperparameters stay fixed ──
+    config_json = save_model_dir + "config.json"
+    resuming = os.path.exists(save_model_dir + "last_checkpoint.pth")
+    if resuming and os.path.exists(config_json):
+        with open(config_json) as f:
+            saved_cfg = json.load(f)
+        for k in LOCKED_CONFIG_KEYS:
+            if k in saved_cfg:
+                if getattr(opt, k) != saved_cfg[k]:
+                    print(f'[config] {k}: ignoring CLI value {getattr(opt, k)!r}, using saved {saved_cfg[k]!r}')
+                setattr(opt, k, saved_cfg[k])
+        print(f'[config] Loaded run config from {config_json}')
+    else:
+        with open(config_json, 'w') as f:
+            json.dump(vars(opt), f, indent=2)
+        print(f'[config] Saved run config to {config_json}')
 
     model_input_size = (
         int(opt.model_input_size.split("_")[0]),
@@ -299,6 +300,7 @@ if __name__ == "__main__":
     last_ckpt = save_model_dir + 'last_checkpoint.pth'
     largest_AP_50 = 0
     start_Epoch   = opt.start_Epoch
+    resumed_ckpt  = None
 
     if os.path.exists(last_ckpt):
         print(f'Resuming from checkpoint: {last_ckpt}')
@@ -308,6 +310,7 @@ if __name__ == "__main__":
         lr_scheduler.load_state_dict(ckpt['lr_scheduler_state_dict'])
         start_Epoch   = ckpt['epoch']
         largest_AP_50 = ckpt['largest_AP_50']
+        resumed_ckpt  = ckpt
         print(f'Resumed from epoch {start_Epoch}, best AP@50 so far: {largest_AP_50:.4f}')
     elif os.path.exists(opt.pretrain_model_path):
         print('Loading pretrained weights...')
@@ -349,10 +352,13 @@ if __name__ == "__main__":
     epoch_size_val = num_val // Batch_size
 
     scaler = GradScaler('cuda', enabled=Cuda)
+    if resumed_ckpt is not None and resumed_ckpt.get('scaler_state_dict') is not None:
+        scaler.load_state_dict(resumed_ckpt['scaler_state_dict'])
+        print('Restored AMP scaler state from checkpoint.')
     print(f'Mixed precision (AMP): {"ON" if Cuda else "OFF"}')
 
     for epoch in range(start_Epoch, end_Epoch):
-        train_loss, val_loss, largest_AP_50, AP_50 = fit_one_epoch(
+        metrics = fit_one_epoch(
             largest_AP_50, net, loss_func, epoch,
             epoch_size, epoch_size_val,
             train_dataloader, val_dataloader,
@@ -361,8 +367,18 @@ if __name__ == "__main__":
             detect_post_process=detect_post_process,
             scaler=scaler
         )
-        if (epoch + 1) >= 2:
-            draw_curve_loss(epoch + 1, train_loss.item(), val_loss.item(), log_pic_name_loss)
-        if (epoch + 1) >= 30:
-            draw_curve_ap50(epoch + 1, AP_50, log_pic_name_ap50)
+        largest_AP_50 = metrics['largest_AP_50']
+
+        # log this epoch's metrics, then regenerate all plots from the full history
+        log_metrics_csv(plots_dir, {
+            'epoch': epoch + 1,
+            'lr': get_lr(optimizer),
+            'train_loss': metrics['train_loss'],
+            'val_loss': metrics['val_loss'],
+            'AP_50': metrics['AP_50'],
+            'REC_50': metrics['REC_50'],
+            'PRE_50': metrics['PRE_50'],
+        })
+        plot_all(plots_dir)
+
         lr_scheduler.step()
