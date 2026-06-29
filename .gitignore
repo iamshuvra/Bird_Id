@@ -13,7 +13,7 @@ __pycache__/
 *.onnx
 data/
 
-datasets/dataloader/*.txt
+datasets/dataloader/*raw.txt
 documents/
 .ipynb_checkpoints/
 
@@ -33,7 +33,7 @@ FBOD/
 **/*.pth
 **/*.jpg
 **/*.png
-**/*.txt
+# **/*.txt
 **/*.json
 **/logs/*
 **/*.sh

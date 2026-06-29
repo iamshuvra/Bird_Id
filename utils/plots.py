@@ -57,6 +57,46 @@ def _save(fig_or_none, plots_dir, name):
     plt.close()
 
 
+def export_table(plots_dir):
+    """Write paper-ready Markdown and LaTeX tables from plots/metrics.csv.
+
+    Produces metrics_table.md and metrics_table.tex in plots_dir. Rows with no
+    detection metrics yet (epoch < 30) show '-' for AP/Recall/Precision.
+    """
+    csv_path = os.path.join(plots_dir, 'metrics.csv')
+    if not os.path.exists(csv_path):
+        return
+    m = _read_metrics(csv_path)
+    n = len(m['epoch'])
+    if n == 0:
+        return
+
+    def cell(metric, i):
+        v = m[metric][i]
+        return f'{v:.4f}' if v > 0 else '-'
+
+    # Markdown
+    md = ['| Epoch | LR | Train Loss | Val Loss | AP@50 | Recall@50 | Precision@50 |',
+          '|---|---|---|---|---|---|---|']
+    for i in range(n):
+        md.append(f"| {m['epoch'][i]} | {m['lr'][i]:.2e} | {m['train_loss'][i]:.4f} | "
+                  f"{m['val_loss'][i]:.4f} | {cell('AP_50', i)} | {cell('REC_50', i)} | {cell('PRE_50', i)} |")
+    with open(os.path.join(plots_dir, 'metrics_table.md'), 'w') as f:
+        f.write('\n'.join(md) + '\n')
+
+    # LaTeX
+    tex = [r'\begin{table}[h]', r'\centering',
+           r'\caption{Training metrics per epoch on FBD-SV-2024.}',
+           r'\begin{tabular}{ccccccc}', r'\hline',
+           r'Epoch & LR & Train Loss & Val Loss & AP$_{50}$ & Recall$_{50}$ & Precision$_{50}$ \\', r'\hline']
+    for i in range(n):
+        tex.append(f"{m['epoch'][i]} & {m['lr'][i]:.2e} & {m['train_loss'][i]:.4f} & "
+                   f"{m['val_loss'][i]:.4f} & {cell('AP_50', i)} & {cell('REC_50', i)} & {cell('PRE_50', i)} \\\\")
+    tex += [r'\hline', r'\end{tabular}', r'\end{table}']
+    with open(os.path.join(plots_dir, 'metrics_table.tex'), 'w') as f:
+        f.write('\n'.join(tex) + '\n')
+
+
 def plot_all(plots_dir):
     """Regenerate every plot from plots/metrics.csv. Safe to call each epoch."""
     csv_path = os.path.join(plots_dir, 'metrics.csv')
@@ -144,3 +184,6 @@ def plot_all(plots_dir):
     fig.tight_layout()
     fig.savefig(os.path.join(plots_dir, 'training_overview.png'), dpi=120, bbox_inches='tight')
     plt.close(fig)
+
+    # refresh the paper-ready tables alongside the plots
+    export_table(plots_dir)
