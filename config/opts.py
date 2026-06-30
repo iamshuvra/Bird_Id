@@ -33,7 +33,11 @@ class opts(object):
         
         self.parser.add_argument('--data_root_path', default="./data/FBD-SV-2024/", type=str,
                             help='data_root_path: The path of the dataset.')
-        
+
+        self.parser.add_argument('--save_root', default="logs/", type=str,
+                            help='save_root: Root folder for checkpoints, config, logs and plots. '
+                                 'On Colab set to a Google Drive path, e.g. /content/drive/MyDrive/Bird_Id_logs/')
+
         self.parser.add_argument('--scale_factor', default=80, type=int,
                             help='scale_factor: Object scale normalization factor for single scale output model.')
         

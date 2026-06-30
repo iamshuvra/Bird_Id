@@ -202,8 +202,9 @@ if __name__ == "__main__":
     else:
         raise ValueError("Error! assign_method must be 'auto_assign'.")
 
+    save_root = opt.save_root.rstrip("/") + "/"   # accept "logs" or "logs/" or a Drive path
     save_model_dir = (
-        "logs/" + num_to_english_c_dic[opt.input_img_num] + "/" +
+        save_root + num_to_english_c_dic[opt.input_img_num] + "/" +
         opt.model_input_size + "/" +
         opt.input_mode + "_" + opt.aggregation_method + "_" +
         opt.backbone_name + "_" + opt.fusion_method + "_" +
