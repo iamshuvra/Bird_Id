@@ -79,7 +79,8 @@ class LablesToResults(object):
 
 
 def fit_one_epoch(largest_AP_50, net, loss_func, epoch, epoch_size, epoch_size_val,
-                  gen, genval, Epoch, cuda, save_model_dir, labels_to_results, detect_post_process, scaler):
+                  gen, genval, Epoch, cuda, save_model_dir, labels_to_results, detect_post_process, scaler,
+                  eval_start_epoch=30):
     total_loss = 0
     val_loss = 0
     start_time = time.time()
@@ -139,7 +140,7 @@ def fit_one_epoch(largest_AP_50, net, loss_func, epoch, epoch_size, epoch_size_v
                     loss = loss_func(outputs, targets_val)
                 val_loss += loss
 
-                if (epoch + 1) >= 30:
+                if (epoch + 1) >= eval_start_epoch:
                     all_label_obj_list += labels_to_results.covert(labels_list, iteration)
                     all_obj_result_list += detect_post_process.Process(outputs, iteration)
 
@@ -147,7 +148,7 @@ def fit_one_epoch(largest_AP_50, net, loss_func, epoch, epoch_size, epoch_size_v
             pbar.update(1)
 
     net.train()
-    if (epoch + 1) >= 30:
+    if (epoch + 1) >= eval_start_epoch:
         AP_50, REC_50, PRE_50 = mean_average_precision(all_obj_result_list, all_label_obj_list, iou_threshold=0.5)
     else:
         AP_50, REC_50, PRE_50 = 0, 0, 0
@@ -366,7 +367,8 @@ if __name__ == "__main__":
             end_Epoch, Cuda, save_model_dir,
             labels_to_results=labels_to_results,
             detect_post_process=detect_post_process,
-            scaler=scaler
+            scaler=scaler,
+            eval_start_epoch=opt.eval_start_epoch
         )
         largest_AP_50 = metrics['largest_AP_50']
 

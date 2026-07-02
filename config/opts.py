@@ -66,7 +66,11 @@ class opts(object):
         
         self.parser.add_argument('--end_Epoch', default=100, type=int,
                             help='start_Epoch: the end epoch.')
-        
+
+        self.parser.add_argument('--eval_start_epoch', default=30, type=int,
+                            help='eval_start_epoch: epoch from which AP@50/Recall/Precision are measured. '
+                                 'Default 30 (warm-up). Set to 1 to measure every epoch on short runs.')
+
         self.parser.add_argument('--cross_vx', default="cross_v1", type=str,
                             help='cross_vx: The Cross Validation data set')
         
